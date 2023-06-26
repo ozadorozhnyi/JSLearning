@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Orders Panel</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    </head>
+    <body class="container-fluid">
+        <h3>Orders</h3>
+        <div class="row">
+            <div class="col-5" id="orders"></div>
+            <div class="col-4" id="order-properties"></div>
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const STORAGE_KEY = 'orders';
+                const CHECK_UPDATES_EVERY = 10000; // 10 sec.
+                const ordersUrl = 'http://localhost:3000/orders';
+                const ordersContainer = document.querySelector("#orders");
+                const orderPropsContainer = document.querySelector("#order-properties");
+
+                if (storageIsEmpty()) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+                }
+
+                displayOrders(ordersContainer);
+
+                // update localStorage with data
+                setInterval(() => {
+                    fetch(ordersUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log(data);
+                            if (data.status === 'ok') {
+                                const storageItems = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                                storageItems.unshift(data.payload);
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(storageItems));
+                                displayOrders(ordersContainer);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error in requesting data:', error);
+                        });
+                }, CHECK_UPDATES_EVERY);
+
+                function storageIsEmpty() {
+                    return null === localStorage.getItem(STORAGE_KEY);
+                }
+
+                function displayOrders(container) {
+                    const storageOrders = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                    const p = document.createElement('p');
+                    p.textContent = `Orders list is empty`;
+                    if (storageOrders.length > 0) {
+                        p.innerHTML = storageOrders.map(order => `
+                            <p data-id="${order.id}">
+                                #${order.id}&nbsp;
+                                <strong>${order.fullName}</strong>&nbsp;
+                                <span>${order.order.total}</span>&nbsp;
+                                <a data-id="${order.id}" href="#" class="more">more...</a>&nbsp;
+                            </p>
+                        `).join('');
+                    }
+                    container.innerHTML = '';
+                    container.insertAdjacentHTML("afterbegin", p.innerHTML);
+                }
+
+                document.querySelector('div#orders').addEventListener('click', function(event) {
+                    if (event.target.matches('a.more')) {
+                        const link = event.target;
+                        const orderId = link.dataset.id;
+                        const storageOrders = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];    
+                        if (storageOrders.length > 0) {
+                            const order = storageOrders.find(order => order.id == orderId);
+                            displayOrderProps(order, orderPropsContainer)
+                        }
+                    }
+                });
+
+                function displayOrderProps(order, container) {
+                    container.innerHTML = `
+                        <h3>Order #${order.id}</h3>
+                        <p>Name: ${order.fullName}</p>
+                        <p>Email: <a href="mailto:${order.email}">${order.email}</a></p>
+                        <hr>
+                        <p>Total: ${order.order.total}$</p>
+                        <p>Status: ${order.order.status}</p>
+                        <hr>
+                        <h5>Product Items</h5>
+                    `;
+
+                    const productsList = document.createElement('ol');
+                    order.order.products.forEach(product => {
+                        const li = document.createElement('li');
+                        li.textContent = `${product.name} – ${product.price}$`;
+                        productsList.insertAdjacentElement('afterbegin', li);
+                    });
+                    container.insertAdjacentElement('beforeend', productsList);
+                }
+            });
+            
+        </script>
+    </body>
+</html>
